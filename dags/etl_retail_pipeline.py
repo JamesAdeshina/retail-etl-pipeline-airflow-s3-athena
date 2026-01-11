@@ -1,7 +1,6 @@
-# dags/etl_retail_pipeline.py - COMPLETE VERSION
+# dags/etl_retail_pipeline.py - FINAL WITH AWS
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from airflow.operators.email import EmailOperator
 from datetime import datetime, timedelta
 import sys
 import os
@@ -20,58 +19,97 @@ default_args = {
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
     'email_on_failure': False,
-    'email': False
+    'email_on_retry': False,
 }
 
-# Define all extraction functions
-def extract_table(table_name, limit=None):
-    """Generic extraction function"""
-    return extract_table_to_csv(table_name, limit=limit)
+def extract_customers():
+    return extract_table_to_csv("customers", limit=1000)
 
-# Create DAG
+def extract_products():
+    return extract_table_to_csv("products", limit=600)
+
+def extract_transactions():
+    return extract_table_to_csv("sale_transactions", limit=10000)
+
+def transform_to_silver():
+    return process_bronze_layer()
+
+def create_gold():
+    return create_gold_layer()
+
+def run_quality_checks():
+    return run_data_quality_checks()
+
+# ======== ADD THIS AWS FUNCTION ========
+def upload_to_s3():
+    """Upload all layers to AWS S3"""
+    from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+    
+    # Get credentials from Airflow
+    hook = S3Hook(aws_conn_id='aws_default')
+    credentials = hook.get_credentials()
+    
+    # Import and run upload
+    from aws_upload import upload_all_layers
+    return upload_all_layers(
+        access_key=credentials.access_key,
+        secret_key=credentials.secret_key
+    )
+
+# ========================================
+
 with DAG(
     'retail_etl_pipeline',
     default_args=default_args,
-    description='Complete retail ETL pipeline with data quality',
+    description='Complete retail ETL pipeline with Medallion Architecture',
     schedule_interval='@daily',
     catchup=False,
-    tags=['retail', 'etl', 'data-quality', 'medallion']
+    tags=['retail', 'etl', 'medallion', 'postgresql', 'aws']
 ) as dag:
     
-    # EXTRACTION TASKS (parallel)
-    extract_tasks = []
-    tables_to_extract = [
-        ('customers', 1000),
-        ('products', 1000),
-        ('sale_transactions', 5000),  # Limit due to 1M+ rows
-        ('inventory', 1000),
-        ('stores', None),  # Small table
-        ('sales_managers', None)  # Small table
-    ]
+    # Extraction tasks
+    extract_customers_task = PythonOperator(
+        task_id='extract_customers',
+        python_callable=extract_customers
+    )
     
-    for table_name, limit in tables_to_extract:
-        task = PythonOperator(
-            task_id=f'extract_{table_name}',
-            python_callable=lambda t=table_name, l=limit: extract_table(t, l)
-        )
-        extract_tasks.append(task)
+    extract_products_task = PythonOperator(
+        task_id='extract_products',
+        python_callable=extract_products
+    )
     
-    # TRANSFORMATION TASK
+    extract_transactions_task = PythonOperator(
+        task_id='extract_transactions',
+        python_callable=extract_transactions
+    )
+    
+    # Transformation task
     transform_task = PythonOperator(
-        task_id='transform_bronze_to_silver',
-        python_callable=process_bronze_layer
+        task_id='transform_to_silver',
+        python_callable=transform_to_silver
     )
     
-    # LOAD TASK (Gold layer)
-    load_task = PythonOperator(
-        task_id='create_gold_aggregations',
-        python_callable=create_gold_layer
+    # Gold layer task
+    create_gold_task = PythonOperator(
+        task_id='create_gold_layer',
+        python_callable=create_gold
     )
     
-    # DATA QUALITY TASK
+    # Data quality task
     data_quality_task = PythonOperator(
-        task_id='data_quality_check',
-        python_callable=run_data_quality_checks
+        task_id='run_data_quality_checks',
+        python_callable=run_quality_checks
     )
-    # SET DEPENDENCIES
-    extract_tasks >> transform_task >> load_task >> data_quality_task 
+    
+    # ======== ADD THIS AWS TASK ========
+    upload_task = PythonOperator(
+        task_id='upload_to_s3',
+        python_callable=upload_to_s3
+    )
+    # ====================================
+    
+    # Set task dependencies WITH AWS
+    [extract_customers_task, extract_products_task, extract_transactions_task] >> transform_task
+    transform_task >> create_gold_task
+    create_gold_task >> data_quality_task
+    data_quality_task >> upload_task  # AWS is the LAST step

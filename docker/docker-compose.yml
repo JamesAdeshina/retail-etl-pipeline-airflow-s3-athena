@@ -47,6 +47,9 @@ services:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: eu-west-2
     volumes:
       - ../dags:/opt/airflow/dags
       - ../scripts:/opt/airflow/scripts
