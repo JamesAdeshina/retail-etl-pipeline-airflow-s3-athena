@@ -26,13 +26,25 @@ On-Prem PostgreSQL → Airflow (Docker) → AWS S3 (Bronze/Silver/Gold) → Athe
 ##  Project Structure
 ```
 retail-etl-pipeline-airflow-s3-athena/
-├── dags/ # Airflow DAG definitions
-├── scripts/ # Python ETL scripts
-├── docker/ # Docker configuration
-├── config/ # Configuration files
-├── sql/ # Athena query templates
-├── docs/ # Documentation
-└── data/ # Sample/data files (gitignored)
+├── dags/                           # Airflow DAG definitions
+│   ├── etl_retail_pipeline.py     # Main ETL pipeline with AWS upload
+│   └── upload_to_s3.py            # Standalone AWS upload DAG
+├── scripts/                        # ETL processing scripts
+│   ├── extract.py                 # PostgreSQL → CSV
+│   ├── transform.py               # CSV → Parquet (cleaning)
+│   ├── load.py                    # Business aggregations (Gold layer)
+│   ├── data_quality.py            # Validation checks
+│   └── aws_upload.py              # AWS S3 upload utilities
+├── docker/                         # Container configuration
+│   ├── docker-compose.yml         # PostgreSQL + Airflow setup
+│   └── requirements.txt           # Python dependencies
+├── docs/                          # Documentation
+│   ├── architecture.md           # Technical architecture
+│   └── screenshots/              # Project screenshots
+└── data/                          # Local data storage (gitignored)
+    ├── bronze/                   # Raw CSV files
+    ├── silver/                   # Parquet files (partitioned)
+    └── gold/                     # Business-ready tables
 ```
 
 
