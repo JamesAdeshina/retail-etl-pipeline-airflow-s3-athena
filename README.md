@@ -17,7 +17,6 @@ A production-ready end-to-end ETL pipeline that extracts retail data from Postgr
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
-- [Installation](#installation)
 - [Pipeline Workflow](#pipeline-workflow)
 - [Data Quality](#data-quality)
 - [AWS Integration](#aws-integration)
@@ -106,14 +105,6 @@ retail-etl-pipeline-airflow-s3-athena/
 ├── logs/
 └── docker-compose.yml
 ```
-
-##  Installation
-
-### Prerequisites
-
-- Docker & Docker Compose
-- AWS Account with S3, Glue, and Athena access
-- AWS credentials (Access Key & Secret Key)
 
 ### Setup Steps
 
