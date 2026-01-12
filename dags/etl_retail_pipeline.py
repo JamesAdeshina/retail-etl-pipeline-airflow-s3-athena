@@ -39,8 +39,7 @@ def create_gold():
 
 def run_quality_checks():
     return run_data_quality_checks()
-
-# ======== ADD THIS AWS FUNCTION ========
+ 
 def upload_to_s3():
     """Upload all layers to AWS S3"""
     from airflow.providers.amazon.aws.hooks.s3 import S3Hook
@@ -57,6 +56,39 @@ def upload_to_s3():
     )
 
 # ========================================
+def register_in_glue():
+    """Register tables in AWS Glue for Athena queries"""
+    from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+    from glue_registry import register_all_tables
+    
+    # Get AWS credentials
+    hook = S3Hook(aws_conn_id='aws_default')
+    credentials = hook.get_credentials()
+    
+    # Register tables
+    return register_all_tables(
+        access_key=credentials.access_key,
+        secret_key=credentials.secret_key
+    )
+
+# Add this function to your DAG
+def run_athena_queries():
+    """Run sample Athena queries to verify data"""
+    from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+    from athena_queries import AthenaQueries
+    
+    # Get AWS credentials
+    hook = S3Hook(aws_conn_id='aws_default')
+    credentials = hook.get_credentials()
+    
+    # Run queries
+    athena = AthenaQueries(
+        access_key=credentials.access_key,
+        secret_key=credentials.secret_key,
+        region='eu-west-2'
+    )
+    return athena.run_business_queries()
+
 
 with DAG(
     'retail_etl_pipeline',
@@ -108,8 +140,19 @@ with DAG(
     )
     # ====================================
     
+    register_glue_task = PythonOperator(
+        task_id='register_in_glue',
+        python_callable=register_in_glue
+    )
+
+    run_athena_task = PythonOperator(
+        task_id='run_athena_queries',
+        python_callable=run_athena_queries
+    )
+
+
     # Set task dependencies WITH AWS
     [extract_customers_task, extract_products_task, extract_transactions_task] >> transform_task
     transform_task >> create_gold_task
     create_gold_task >> data_quality_task
-    data_quality_task >> upload_task  # AWS is the LAST step
+    data_quality_task >> upload_task >> register_glue_task >> run_athena_task
