@@ -218,7 +218,7 @@ shopease-gold-james/
 └── product_performance.parquet
 ```
 
-![S3 Buckets](docs/img/s3_buckets.png)
+![S3 Buckets](docs/img/s3_buckets.gif)
 
 ### Athena Queries
 
